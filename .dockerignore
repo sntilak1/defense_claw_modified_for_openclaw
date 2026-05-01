@@ -1,0 +1,17 @@
+.git
+.venv
+node_modules
+extensions/defenseclaw/node_modules
+dist/
+defenseclaw-gateway
+*.db
+.env
+__pycache__
+**/__pycache__
+*.pyc
+.pytest_cache
+coverage/
+.coverage
+bundles/
+docs/
+test/
