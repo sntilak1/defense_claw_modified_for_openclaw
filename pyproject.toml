@@ -1,0 +1,118 @@
+[project]
+name = "defenseclaw"
+version = "0.2.0"
+description = "Enterprise governance layer for OpenClaw — secures agentic AI deployments"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "Apache-2.0" }
+dependencies = [
+    "click==8.3.1",
+    "pyyaml==6.0.3",
+    "requests==2.33.0",
+    "rich>=13.0",
+    "cisco-ai-skill-scanner==2.0.8",
+    "cisco-ai-mcp-scanner>=4.3; python_version>='3.11'",
+]
+
+# P3-#20: the legacy Textual TUI (`defenseclaw alerts --tui`) was
+# retired in favour of the Go-based TUI launched via `defenseclaw tui`.
+# No Python-side TUI extra is shipped anymore; the alerts command now
+# renders a plain Rich table.
+
+[dependency-groups]
+dev = [
+    "pytest==9.0.3",
+    "pytest-cov==7.1.0",
+    "jsonschema>=4.23.0",
+    "ruff==0.15.7",
+    "opentelemetry-api>=1.28.0",
+    "opentelemetry-sdk>=1.28.0",
+]
+
+[project.scripts]
+defenseclaw = "defenseclaw.main:main"
+
+[build-system]
+requires = ["setuptools==82.0.1"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["cli"]
+exclude = ["tests", "tests.*"]
+
+[tool.setuptools.package-data]
+defenseclaw = [
+    "_data/policies/*.yaml",
+    "_data/policies/rego/*.rego",
+    "_data/policies/rego/*.json",
+    "_data/skills/codeguard/*.md",
+    "_data/skills/codeguard/*.yaml",
+    "_data/skills/codeguard/*.py",
+    "_data/splunk_local_bridge/bin/*",
+    "_data/splunk_local_bridge/compose/*",
+    "_data/splunk_local_bridge/env/.env.example",
+    "_data/splunk_local_bridge/splunk/*",
+    "_data/splunk_local_bridge/splunk/ansible/*",
+    "_data/splunk_local_bridge/splunk/bin/*",
+    "_data/splunk_local_bridge/splunk/apps/defenseclaw_local_mode/bin/*",
+    "_data/splunk_local_bridge/splunk/apps/defenseclaw_local_mode/default/*",
+    "_data/splunk_local_bridge/splunk/apps/defenseclaw_local_mode/default/data/ui/nav/*",
+    "_data/splunk_local_bridge/splunk/apps/defenseclaw_local_mode/default/data/ui/views/*",
+    "_data/splunk_local_bridge/splunk/apps/defenseclaw_local_mode/metadata/*",
+    "_data/scripts/*.sh",
+    "_data/policies/openshell/*.rego",
+    "_data/policies/openshell/*.yaml",
+    "_data/policies/guardrail/default/*.yaml",
+    "_data/policies/guardrail/default/judge/*.yaml",
+    "_data/policies/guardrail/default/rules/*.yaml",
+    "_data/policies/guardrail/strict/*.yaml",
+    "_data/policies/guardrail/strict/judge/*.yaml",
+    "_data/policies/guardrail/strict/rules/*.yaml",
+    "_data/policies/guardrail/permissive/*.yaml",
+    "_data/policies/guardrail/permissive/judge/*.yaml",
+    "_data/policies/guardrail/permissive/rules/*.yaml",
+    "_data/local_observability_stack/*.md",
+    "_data/local_observability_stack/*.yml",
+    "_data/local_observability_stack/*.sh",
+    "_data/local_observability_stack/bin/*",
+    "_data/local_observability_stack/otel-collector/*.yaml",
+    "_data/local_observability_stack/prometheus/*.yml",
+    "_data/local_observability_stack/prometheus/rules/*.yml",
+    "_data/local_observability_stack/loki/*.yaml",
+    "_data/local_observability_stack/tempo/*.yaml",
+    "_data/local_observability_stack/grafana/dashboards/*.json",
+    "_data/local_observability_stack/grafana/provisioning/dashboards/*.yml",
+    "_data/local_observability_stack/grafana/provisioning/datasources/*.yml",
+]
+
+[tool.uv]
+default-groups = ["dev"]
+# cisco-ai-skill-scanner 2.0.6 pins rich==14.2.0 but also pins
+override-dependencies = [
+    "rich>=13.7.1,<14.0.0",
+    "cryptography>=46.0.7",   # CVE-2026-39892 fixed in 46.0.7
+    "litellm==1.83.7",        # CVE-2026-35029, CVE-2026-35030, GHSA-xqmj-j6mv-4862
+    # litellm 1.83.7 ships exact pins for several transitive deps that
+    # conflict with what cisco-ai-skill-scanner 2.0.8 (and our own pins)
+    # expect. We override to a single compatible version per package —
+    # the newer of the two — and rely on litellm's runtime API surface
+    # being compatible with the bumped versions (verified via Python
+    # tests in CI). CVE-2026-28684 (python-dotenv 1.2.1) is tracked via
+    # pip-audit's ignore list in ci.yml.
+    "python-dotenv==1.2.1",
+    "openai==2.30.0",
+    "click>=8.3.1",
+    "importlib-metadata>=8.7.1",
+    "jsonschema>=4.26.0",
+    "python-multipart>=0.0.26", # CVE-2026-40347 fixed in 0.0.26
+]
+
+[tool.ruff]
+target-version = "py310"
+line-length = 120
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "W", "UP"]
+
+[tool.pytest.ini_options]
+testpaths = ["cli/tests"]

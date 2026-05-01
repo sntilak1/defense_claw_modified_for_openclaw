@@ -1,0 +1,234 @@
+# Copyright 2026 Cisco Systems, Inc. and its affiliates
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# SPDX-License-Identifier: Apache-2.0
+
+package defenseclaw.guardrail_test
+
+import data.defenseclaw.guardrail
+import rego.v1
+
+_guardrail_data := {
+	"severity_rank": {"NONE": 0, "LOW": 1, "MEDIUM": 2, "HIGH": 3, "CRITICAL": 4},
+	"block_threshold": 3,
+	"alert_threshold": 2,
+	"cisco_trust_level": "full",
+}
+
+test_allow_when_no_findings if {
+	result := guardrail with input as {
+		"direction": "prompt",
+		"model": "test-model",
+		"mode": "action",
+		"scanner_mode": "local",
+		"local_result": {"action": "allow", "severity": "NONE", "findings": [], "reason": ""},
+		"cisco_result": null,
+		"content_length": 100,
+	}
+		with data.guardrail as _guardrail_data
+
+	result.action == "allow"
+	result.severity == "NONE"
+}
+
+test_block_on_high_local if {
+	result := guardrail with input as {
+		"direction": "prompt",
+		"model": "test-model",
+		"mode": "action",
+		"scanner_mode": "local",
+		"local_result": {"action": "block", "severity": "HIGH", "findings": ["ignore previous"], "reason": "matched: ignore previous"},
+		"cisco_result": null,
+		"content_length": 200,
+	}
+		with data.guardrail as _guardrail_data
+
+	result.action == "block"
+	result.severity == "HIGH"
+}
+
+test_alert_on_medium_local if {
+	result := guardrail with input as {
+		"direction": "prompt",
+		"model": "test-model",
+		"mode": "action",
+		"scanner_mode": "local",
+		"local_result": {"action": "alert", "severity": "MEDIUM", "findings": ["sk-"], "reason": "matched: sk-"},
+		"cisco_result": null,
+		"content_length": 150,
+	}
+		with data.guardrail as _guardrail_data
+
+	result.action == "alert"
+	result.severity == "MEDIUM"
+}
+
+test_observe_mode_never_blocks if {
+	result := guardrail with input as {
+		"direction": "prompt",
+		"model": "test-model",
+		"mode": "observe",
+		"scanner_mode": "local",
+		"local_result": {"action": "block", "severity": "HIGH", "findings": ["jailbreak"], "reason": "matched: jailbreak"},
+		"cisco_result": null,
+		"content_length": 200,
+	}
+		with data.guardrail as _guardrail_data
+
+	result.action == "alert"
+	result.severity == "HIGH"
+}
+
+test_observe_mode_medium_still_alerts if {
+	result := guardrail with input as {
+		"direction": "prompt",
+		"model": "test-model",
+		"mode": "observe",
+		"scanner_mode": "local",
+		"local_result": {"action": "alert", "severity": "MEDIUM", "findings": ["sk-"], "reason": "matched: sk-"},
+		"cisco_result": null,
+		"content_length": 150,
+	}
+
+	result.action == "alert"
+	result.severity == "MEDIUM"
+}
+
+test_observe_mode_critical_alerts_not_blocks if {
+	result := guardrail with input as {
+		"direction": "prompt",
+		"model": "test-model",
+		"mode": "observe",
+		"scanner_mode": "local",
+		"local_result": {"action": "block", "severity": "CRITICAL", "findings": ["jailbreak"], "reason": "matched: jailbreak"},
+		"cisco_result": null,
+		"content_length": 200,
+	}
+
+	result.action == "alert"
+	result.severity == "CRITICAL"
+}
+
+test_observe_mode_clean_stays_allow if {
+	result := guardrail with input as {
+		"direction": "prompt",
+		"model": "test-model",
+		"mode": "observe",
+		"scanner_mode": "local",
+		"local_result": {"action": "allow", "severity": "NONE", "findings": [], "reason": ""},
+		"cisco_result": null,
+		"content_length": 100,
+	}
+
+	result.action == "allow"
+	result.severity == "NONE"
+}
+
+test_cisco_only_block if {
+	result := guardrail with input as {
+		"direction": "prompt",
+		"model": "test-model",
+		"mode": "action",
+		"scanner_mode": "remote",
+		"local_result": null,
+		"cisco_result": {"action": "block", "severity": "HIGH", "findings": ["Prompt Injection"], "reason": "cisco: Prompt Injection"},
+		"content_length": 300,
+	}
+		with data.guardrail as _guardrail_data
+
+	result.action == "block"
+	result.severity == "HIGH"
+}
+
+test_both_mode_cisco_escalates if {
+	result := guardrail with input as {
+		"direction": "prompt",
+		"model": "test-model",
+		"mode": "action",
+		"scanner_mode": "both",
+		"local_result": {"action": "allow", "severity": "NONE", "findings": [], "reason": ""},
+		"cisco_result": {"action": "block", "severity": "HIGH", "findings": ["SECURITY_VIOLATION"], "reason": "cisco: SECURITY_VIOLATION"},
+		"content_length": 400,
+	}
+		with data.guardrail as _guardrail_data
+
+	result.action == "block"
+	result.severity == "HIGH"
+}
+
+test_both_mode_combined_reasons if {
+	result := guardrail with input as {
+		"direction": "prompt",
+		"model": "test-model",
+		"mode": "action",
+		"scanner_mode": "both",
+		"local_result": {"action": "alert", "severity": "MEDIUM", "findings": ["sk-"], "reason": "matched: sk-"},
+		"cisco_result": {"action": "block", "severity": "HIGH", "findings": ["Data Leak"], "reason": "cisco: Data Leak"},
+		"content_length": 500,
+	}
+		with data.guardrail as _guardrail_data
+
+	result.severity == "HIGH"
+	result.action == "block"
+	contains(result.reason, "matched: sk-")
+	contains(result.reason, "cisco: Data Leak")
+}
+
+test_advisory_cisco_downgrades_to_alert if {
+	result := guardrail with input as {
+		"direction": "prompt",
+		"model": "test-model",
+		"mode": "action",
+		"scanner_mode": "both",
+		"local_result": {"action": "allow", "severity": "NONE", "findings": [], "reason": ""},
+		"cisco_result": {"action": "block", "severity": "HIGH", "findings": ["Prompt Injection"], "reason": "cisco: Prompt Injection"},
+		"content_length": 300,
+	}
+		with data.guardrail as object.union(_guardrail_data, {"cisco_trust_level": "advisory"})
+
+	result.action == "alert"
+}
+
+test_scanner_sources_populated if {
+	result := guardrail with input as {
+		"direction": "prompt",
+		"model": "test-model",
+		"mode": "action",
+		"scanner_mode": "both",
+		"local_result": {"action": "alert", "severity": "MEDIUM", "findings": ["sk-"], "reason": "matched: sk-"},
+		"cisco_result": {"action": "block", "severity": "HIGH", "findings": ["Prompt Injection"], "reason": "cisco: Prompt Injection"},
+		"content_length": 500,
+	}
+		with data.guardrail as _guardrail_data
+
+	"local-pattern" in result.scanner_sources
+	"ai-defense" in result.scanner_sources
+	"opa-policy" in result.scanner_sources
+}
+
+test_cisco_trust_none_ignores_cisco if {
+	result := guardrail with input as {
+		"direction": "prompt",
+		"model": "test-model",
+		"mode": "action",
+		"scanner_mode": "both",
+		"local_result": {"action": "allow", "severity": "NONE", "findings": [], "reason": ""},
+		"cisco_result": {"action": "block", "severity": "HIGH", "findings": ["Prompt Injection"], "reason": "cisco: Prompt Injection"},
+		"content_length": 300,
+	}
+		with data.guardrail as object.union(_guardrail_data, {"cisco_trust_level": "none"})
+
+	result.action == "allow"
+	result.severity == "NONE"
+}

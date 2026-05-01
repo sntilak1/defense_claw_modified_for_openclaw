@@ -1,0 +1,77 @@
+version: 2
+
+project_name: defenseclaw
+
+builds:
+  - id: defenseclaw
+    main: ./cmd/defenseclaw
+    binary: defenseclaw
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w -X main.version={{.Version}} -X main.commit={{.Commit}} -X main.date={{.Date}}
+
+archives:
+  - id: default
+    formats:
+      - tar.gz
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+
+checksum:
+  name_template: "checksums.txt"
+
+sboms:
+  - artifacts: archive
+    cmd: syft
+
+signs:
+  - cmd: cosign
+    certificate: "${artifact}.pem"
+    args:
+      - sign-blob
+      - "--yes"
+      - "--output-certificate=${certificate}"
+      - "--output-signature=${signature}"
+      - "${artifact}"
+    artifacts: checksum
+    output: true
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - "^chore:"
+      - "Merge pull request"
+
+release:
+  disable: "true"
+
+homebrew_casks:
+  - repository:
+      owner: cisco-ai-defense
+      name: homebrew-tap
+      token: "{{ .Env.GITHUB_TOKEN }}"
+    # release.disable is on (immutable releases require atomic creation in CI),
+    # so GoReleaser cannot infer the cask download URL from the release config.
+    # Point at the canonical GitHub release-asset URL that our workflow will
+    # populate via `gh release create` immediately after this step.
+    url:
+      template: "https://github.com/cisco-ai-defense/defenseclaw/releases/download/{{ .Tag }}/{{ .ArtifactName }}"
+    skip_upload: auto
+    name: defenseclaw
+    homepage: "https://github.com/cisco-ai-defense/defenseclaw"
+    description: "Enterprise governance layer for OpenClaw"
+    hooks:
+      post:
+        install: |
+          if OS.mac?
+            system_command "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "#{staged_path}/defenseclaw"]
+          end

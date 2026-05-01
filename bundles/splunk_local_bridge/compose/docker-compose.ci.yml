@@ -1,0 +1,19 @@
+name: splunk-claw-bridge-ci
+
+services:
+  splunk:
+    image: ${SPLUNK_IMAGE}
+    env_file:
+      - ${SPLUNK_ENV_FILE:-../env/.env.example}
+    ports:
+      # Bound to 0.0.0.0 so the runner host can expose dashboards and HEC when needed.
+      - "0.0.0.0:8000:8000"
+      - "0.0.0.0:8088:8088"
+      - "0.0.0.0:8089:8089"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - /opt/splunk/etc
+      - /opt/splunk/var
+      - ../splunk/default.yml:/tmp/defaults/default.yml:ro
+      - ../splunk:/opt/splunk-claw-bridge/splunk:ro

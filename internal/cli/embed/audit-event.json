@@ -1,0 +1,107 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://defenseclaw.io/schemas/audit-event.json",
+  "title": "DefenseClaw Audit Event",
+  "description": "Row persisted in audit_events (SQLite) and forwarded to Splunk/HTTP sinks. v7 adds provenance (SchemaVersion=7) + three-tier agent identity. Consumers MUST treat every field marked optional as nullable — not every action emits every field.",
+  "type": "object",
+  "required": ["id", "timestamp", "action", "actor", "schema_version"],
+  "properties": {
+    "id": { "type": "string", "format": "uuid" },
+    "timestamp": { "type": "string", "format": "date-time" },
+    "action": {
+      "type": "string",
+      "description": "Curated action — see internal/audit/actions.go (Go) and cli/defenseclaw/audit_actions.py (Python). Extending this enum is a minor schema bump.",
+      "enum": [
+        "init",
+        "stop",
+        "ready",
+        "scan",
+        "scan-start",
+        "rescan",
+        "rescan-start",
+        "block",
+        "allow",
+        "warn",
+        "quarantine",
+        "restore",
+        "disable",
+        "enable",
+        "deploy",
+        "drift",
+        "network-egress-blocked",
+        "network-egress-allowed",
+        "guardrail-block",
+        "guardrail-warn",
+        "guardrail-allow",
+        "approval-request",
+        "approval-granted",
+        "approval-denied",
+        "tool-call",
+        "tool-result",
+        "config-update",
+        "policy-update",
+        "policy-reload",
+        "action",
+        "acknowledge-alerts",
+        "dismiss-alerts",
+        "webhook-delivered",
+        "webhook-failed",
+        "sink-failure",
+        "sink-restored",
+        "alert"
+      ]
+    },
+    "target": {
+      "type": ["string", "null"],
+      "description": "Target of the action (skill id, mcp server id, policy id, etc). Nullable — lifecycle events like 'init' and 'ready' have no target."
+    },
+    "actor": {
+      "type": "string",
+      "description": "Who caused the action. Format: '<subsystem>:<principal>' (e.g. 'cli:alice', 'scanner:skill', 'system')."
+    },
+    "details": {
+      "type": ["string", "null"],
+      "description": "Redacted free-form detail blob. JSON-encoded payload after sanitizer. Treat as opaque."
+    },
+    "severity": {
+      "type": "string",
+      "enum": ["CRITICAL", "HIGH", "MEDIUM", "LOW", "INFO", "WARN"],
+      "default": "INFO"
+    },
+
+    "run_id":     { "type": ["string", "null"] },
+    "session_id": { "type": ["string", "null"] },
+    "trace_id":   { "type": ["string", "null"] },
+    "span_id":    { "type": ["string", "null"] },
+
+    "agent_id":            { "type": ["string", "null"], "description": "Stable agent identity across process restarts." },
+    "agent_name":          { "type": ["string", "null"], "description": "Human-readable agent name." },
+    "agent_instance_id":   { "type": ["string", "null"], "description": "Per-session agent identity — rotates on new session." },
+    "sidecar_instance_id": { "type": ["string", "null"], "description": "Per-process sidecar identity — rotates on every defenseclaw gateway start." },
+
+    "destination_app": { "type": ["string", "null"], "description": "Tool provider / downstream app. Optional." },
+    "tool_name":       { "type": ["string", "null"] },
+    "tool_id":         { "type": ["string", "null"] },
+    "policy_id":       { "type": ["string", "null"] },
+
+    "schema_version": {
+      "type": "integer",
+      "minimum": 7,
+      "description": "Audit row format version. v7 = provenance + three-tier agent identity. Downstream MUST reject unrecognized versions."
+    },
+    "content_hash": {
+      "type": ["string", "null"],
+      "description": "SHA-256 hex of the canonical JSON serialization of the emitting config / policy at emit time. Optional; present when the event describes a configurable surface."
+    },
+    "generation": {
+      "type": ["integer", "null"],
+      "minimum": 0,
+      "description": "Monotonic counter incremented on every Save of the governing config/policy. Optional."
+    },
+    "binary_version": {
+      "type": ["string", "null"],
+      "description": "Semver of the DefenseClaw binary that produced the event."
+    }
+  },
+  "additionalProperties": false
+}
