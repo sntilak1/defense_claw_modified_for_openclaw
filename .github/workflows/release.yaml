@@ -56,7 +56,7 @@ jobs:
       # .goreleaser.yaml). This is required because the repository has
       # "Immutable releases" enabled, which rejects post-create asset uploads.
       - name: Build artifacts with GoReleaser
-        uses: goreleaser/goreleaser-action@v6
+        uses: goreleaser/goreleaser-action@v7
         with:
           version: "~> v2"
           args: release --clean
