@@ -126,8 +126,15 @@ func NewSidecar(cfg *config.Config, store *audit.Store, logger *audit.Logger, sh
 
 	// In standalone sandbox mode the veth link is point-to-point;
 	// TLS is not needed and OpenClaw serves plain WS.
-	if !cfg.Gateway.RequiresTLSWithMode(&cfg.OpenShell) {
+	// DEFENSECLAW_NO_TLS=1 also forces plain WS (e.g. Docker deployments
+	// where the gateway is on the host network without a TLS terminator).
+	switch strings.ToLower(strings.TrimSpace(os.Getenv("DEFENSECLAW_NO_TLS"))) {
+	case "1", "true", "yes", "on":
 		cfg.Gateway.NoTLS = true
+	default:
+		if !cfg.Gateway.RequiresTLSWithMode(&cfg.OpenShell) {
+			cfg.Gateway.NoTLS = true
+		}
 	}
 
 	client, err := NewClient(&cfg.Gateway)

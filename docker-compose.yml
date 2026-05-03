@@ -1,0 +1,28 @@
+name: defenseclaw
+
+services:
+  defenseclaw:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: defenseclaw:local
+    container_name: defenseclaw
+    restart: unless-stopped
+    environment:
+      DEFENSECLAW_DATA_DIR: /data
+      DEFENSECLAW_NO_TLS: "1"
+      OPENCLAW_HOST: ${OPENCLAW_HOST:-host-gateway}
+      OPENCLAW_PORT: ${OPENCLAW_PORT:-18789}
+      GUARDRAIL_MODE: ${GUARDRAIL_MODE:-observe}
+      OPENCLAW_GATEWAY_TOKEN: ${OPENCLAW_GATEWAY_TOKEN:-}
+    volumes:
+      - defenseclaw-data:/root/.defenseclaw
+      - /opt/openclaw/config:/root/.openclaw
+    ports:
+      - "127.0.0.1:4000:4000"   # guardrail proxy
+      - "127.0.0.1:18970:18970" # sidecar REST API
+    extra_hosts:
+      - "host-gateway:host-gateway"
+
+volumes:
+  defenseclaw-data:

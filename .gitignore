@@ -49,6 +49,9 @@ cli/defenseclaw/_data/
 
 # Node.js
 node_modules/
+# Root-level package.json/lock are debugging artifacts (ws install), not project files
+/package.json
+/package-lock.json
 
 # Python
 .venv/

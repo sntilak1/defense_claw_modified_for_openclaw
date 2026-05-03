@@ -16,7 +16,9 @@ WORKDIR /build
 COPY . .
 
 # Build everything (gateway binary + Python CLI venv + TypeScript plugin)
-RUN NO_QUICKSTART=1 NO_LLM_SETUP=1 make install
+# Then reinstall non-editably so the venv is self-contained (no /build dependency)
+RUN NO_QUICKSTART=1 NO_LLM_SETUP=1 make install \
+ && uv pip install . --python .venv/bin/python --reinstall-package defenseclaw
 
 # Stage 2 — Minimal runtime image
 FROM debian:bookworm-slim
@@ -34,8 +36,12 @@ COPY --from=builder /root/.local/bin/defenseclaw /usr/local/bin/defenseclaw
 COPY --from=builder /root/.local/bin/defenseclaw-gateway /usr/local/bin/defenseclaw-gateway
 COPY --from=builder /root/.defenseclaw/extensions /root/.defenseclaw/extensions
 
-# Copy Python venv
+# Copy uv-managed Python so venv symlinks resolve, then copy the venv itself
+COPY --from=builder /root/.local/share/uv/python /root/.local/share/uv/python
 COPY --from=builder /build/.venv /opt/defenseclaw/venv
+# Fix any remaining hardcoded builder-path shebangs (covers the CLI entry script)
+RUN find /opt/defenseclaw/venv/bin /usr/local/bin -maxdepth 1 -type f \
+    -exec sed -i '1s|^#!.*python.*|#!/opt/defenseclaw/venv/bin/python|' {} +
 ENV PATH="/opt/defenseclaw/venv/bin:$PATH"
 
 # Copy policies and schemas

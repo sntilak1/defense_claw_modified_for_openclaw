@@ -23,7 +23,8 @@ case "${1:-start}" in
     start)
         init_if_needed
         echo "[entrypoint] Starting defenseclaw-gateway..."
-        exec defenseclaw-gateway start
+        defenseclaw-gateway start
+        exec defenseclaw-gateway watchdog
         ;;
     init)
         init_if_needed
